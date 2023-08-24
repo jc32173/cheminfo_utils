@@ -1,0 +1,22 @@
+# From: https://en.wikipedia.org/wiki/Electronegativities_of_the_elements_(data_page)
+atomic_number,symbol,name,pauling_electronegativity
+1,H,hydrogen,2.20
+2,He,helium,no data
+3,Li,lithium,0.98
+4,Be,beryllium,1.57
+5,B,boron,2.04
+6,C,carbon,2.55
+7,N,nitrogen,3.04
+8,O,oxygen,3.5
+9,F,fluorine,3.98
+10,Ne,neon,
+11,Na,sodium,0.93
+12,Mg,magnesium,1.31
+13,Al,aluminium,1.61
+14,Si,silicon,1.90
+15,P,phosphorus,2.19
+16,S,sulfur,2.58
+17,Cl,chlorine,3.16
+18,Ar,argon,no data
+19,K,potassium,0.82
+20,Ca,calcium,1.00 
