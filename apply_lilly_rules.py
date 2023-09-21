@@ -1,10 +1,14 @@
+"""
+Code to call Lilly_Medchem_Rules.rb script from within python and process the output.
+"""
+
 import subprocess
 import tempfile
 import pandas as pd
 import glob
 from rdkit import Chem
 
-import sys
+import sys, os
 sys.path.insert(0, '/users/xpb20111/programs/')
 from python_utils.pandas_utils import conv_df_to_str
 
@@ -26,11 +30,24 @@ def apply_lilly_rules(df=None,
                       cleanup=True,
                       run_in_temp_dir=True,
                       lilly_rules_script=\
-                          '/users/xpb20111/software/'+\
-                          'Lilly-Medchem-Rules/Lilly_Medchem_Rules.rb'):
+                          'Lilly_Medchem_Rules.rb'):
     """
     Apply Lilly rules to SMILES in a list or a DataFrame.
-    
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        DataFrame containing SMILES
+    smiles_col: str
+        Name of SMILES column
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing results of applying Lilly's rules to SMILES, including pass/fail and warnings
+
+    Example
+    -------
     >>> apply_lilly_rules(smiles=['CCCCCCC(=O)O', 'CCC', 'CCCCC(=O)OCC', 'c1ccccc1CC(=O)C'])
                 SMILES       SMILES_Kekule  Lilly_rules_pass      Lilly_rules_warning  Lilly_rules_SMILES
     0     CCCCCCC(=O)O        CCCCCCC(=O)O              True        D(80) C6:no_rings        CCCCCCC(=O)O
@@ -38,6 +55,9 @@ def apply_lilly_rules(df=None,
     2     CCCCC(=O)OCC        CCCCC(=O)OCC              True  D(75) ester:no_rings:C4        CCCCC(=O)OCC
     3  c1ccccc1CC(=O)C  CC(=O)CC1=CC=CC=C1              True                     None  CC(=O)CC1=CC=CC=C1
     """
+
+    if not os.path.isfile(lilly_rules_script):
+        raise FileNotFoundError('Cannot find Lilly rules script (Lilly_Medchem_Rules.rb) at: {}'.format(lilly_rules_script))
 
     # Write from DataFrame:
     if df is not None:
