@@ -10,8 +10,13 @@ import numpy as np
 import pandas as pd
 import re
 
+#from cheminfo_utils.smi_funcs import canonicalise_tautomer, correct_smiles, \
+#    adjust_for_ph, calc_rdkit_descs
+#from cheminfo_utils.mordred_fns import calc_mordred_desc
+
 from cheminfo_utils.smi_funcs import canonicalise_tautomer, correct_smiles, \
     adjust_for_ph, calc_rdkit_descs
+from cheminfo_utils.mordred_fns import calc_mordred_desc
 
 
 # Process SMILES before calculating descriptors 
@@ -105,13 +110,15 @@ def calc_desc(smi_ls,
         descs.append(rdkit_desc)
 
     if 'Mordred' in descriptors:
-        raise NotImplementedError('')
-        #if isinstance(descriptors, dict):
-        #    desc_ls = descriptors['Mordred']
-        #else:
-        #    desc_ls = None
+        #raise NotImplementedError('')
+        if isinstance(descriptors, dict):
+            desc_ls = descriptors['Mordred']
+        else:
+            desc_ls = None
 
-        #descs.append(calc_mordred_desc(processed_smiles))
+        mordred_desc = calc_mordred_desc(mols, id_ls=smi_ls, rm_const_desc=rm_const)
+        mordred_desc.columns = ['Mordred_'+col for col in mordred_desc.columns]
+        descs.append(mordred_desc)
 
     if 'CDDD' in descriptors:
         # See: https://github.com/jrwnter/cddd
@@ -145,17 +152,19 @@ def calc_desc(smi_ls,
     # Check no NaN in descriptors and remove if found:
     if rm_na:
         if df_desc.isnull().values.any():
-            print('WARNING: Initial set of descriptors contained NaN values:')
-            print('Descriptor\tNumber of molecules with NaN values')
-            for d_nan in df_desc_only.columns[df_desc_only.isnull().any()]:
-                print(d_nan+'\t'+sum(df_desc_only[d_nan].isna()))
-            print('These will be removed')
+            #print('WARNING: Initial set of descriptors contained NaN values:')
+            #print('Descriptor\tNumber of molecules with NaN values')
+            #for d_nan in df_desc.columns[df_desc.isnull().any()]:
+            #    print(d_nan+'\t{}'.format(sum(df_desc[d_nan].isna())))
+            #print('These will be removed')
             df_desc = df_desc.drop(df_desc.columns[df_desc.isnull().any()], axis=1, inplace=True)
 
     # Remove constant descriptors?
 
     if output_processed_smiles:
         pass
+
+    print(len(df_desc))
 
     return df_desc
 

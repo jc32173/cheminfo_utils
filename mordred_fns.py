@@ -10,12 +10,25 @@ descriptors2D = [d for d in Calculator(descriptors).descriptors if not d.require
 descriptors3D = [d for d in Calculator(descriptors).descriptors if d.require_3D]
 
 
-def calc_mordred_desc(mol_ls, ignore_3D=False, descriptor_ls=descriptors, rm_const_desc=True):
+def calc_mordred_desc(cmpd_ls, id_ls=[], ignore_3D=False, descriptor_ls=descriptors, rm_const_desc=True):
     """
     Function to calculate mordred descriptors.
     """
+
+    if isinstance(cmpd_ls, str):
+        cmpd_ls = [cmpd_ls]
+
+    # Set up index:
+    if len(id_ls) == 0:
+        if isinstance(cmpd_ls[0], str):
+            id_ls = cmpd_ls
+        else:
+            id_ls = range(len(cmpd_ls))
+
     calc = Calculator(descriptor_ls, ignore_3D=ignore_3D)
-    df_desc = calc.pandas(mol_ls)
+    df_desc = calc.pandas(cmpd_ls)
+    df_desc.index = id_ls
+
     # Remove any column which contains missing values, based on entries of type: mordred.error.Missing
     # or error, based on mordred.error.Error:
     miss_descs = []
