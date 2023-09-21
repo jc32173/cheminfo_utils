@@ -134,12 +134,24 @@ def canonicalise_tautomer(smi, method='rdkit'):
     return canon_smi
 
 
-def GetPossibleTautomers(mol):
+def GetPossibleTautomers(mol, sort=False, return_scores=False):
     """
     Generate list of all possible tautomers.
     """
     enumerator = rdMolStandardize.TautomerEnumerator()
-    return [Chem.MolToSmiles(m) for m in enumerator.Enumerate(mol)]
+    if not sort and not return_scores:
+        return [Chem.MolToSmiles(m) for m in enumerator.Enumerate(mol)]
+    else:
+        tauto_ls = [[Chem.MolToSmiles(tauto), enumerator.ScoreTautomer(tauto)] 
+                    for tauto in enumerator.Enumerate(mol)]
+        if not sort:
+            return tauto_ls
+        else:
+            tauto_ls = sorted(tauto_ls, key=lambda x: x[1])[::-1]
+            if return_scores:
+                return tauto_ls
+            else:
+                return [tauto[0] for tauto in tauto_ls]
 
 
 # From: Troubleshoot_issues_with_acpype:
