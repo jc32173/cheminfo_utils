@@ -150,6 +150,14 @@ def canonicalise_tautomer_substruct(cmpd, substruct=None):
     return enumerator.Canonicalize(cmpd)
 
 
+#def select_tautomer(rank=0):
+#    """
+#    Select specific ranked tautomer or one tautomer at random.
+#    """
+#    for i, tauto in enumerate(enumerator.Enumerate(cmpd)):
+#        tauto_ls.append([enumerator.ScoreTautomer(tauto), tauto])
+
+
 # Correct SMILES using regex:
 def correct_smiles(smi, smi_transforms, check_rdkit=True):
     """
@@ -316,7 +324,7 @@ def calc_rdkit_descs(cmpd_ls,
         if isinstance(cmpd_ls[0], str):
             id_ls = cmpd_ls
         else:
-            id_ls = range(cmpd_ls)
+            id_ls = range(len(cmpd_ls))
 
     # Combine index and compounds:
     cmpd_id_ls = zip(id_ls, cmpd_ls)
