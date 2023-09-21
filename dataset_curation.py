@@ -3,6 +3,9 @@
 import math
 import sys, os
 from rdkit import Chem
+from rdkit.Chem.SaltRemover import SaltRemover
+from rdkit.Chem.Scaffolds.MurckoScaffold import MurckoScaffoldSmiles
+import numpy as np
 import pandas as pd
 import re
 
@@ -95,6 +98,17 @@ def find_stereoisomers(sr_smi):
 
     return df_isomers.loc[idx_order]
 
+
+def _pass_lipinski(molwt, logp, hdonors, hacceptors):
+    if (molwt < 500) and \
+       (logp <= 5) and \
+       (hdonors <= 5) and \
+       (hacceptors <= 10):
+        return True
+    else:
+        return False
+
+
 # def silence_print(fn):
 #     def redirect_stdout(*args, **kwags):
 #         old_stdout = sys.stdout # backup current stdout
@@ -180,10 +194,17 @@ def find_stereoisomers(sr_smi):
 #        df.drop(columns='Mol', inplace=True)
 
 
+#def GetMol(smiles, rm_salts=True):
+#    mol = Chem.MolFromSmiles(smiles)
+#    if rm_salts and (mol is not None):
+#        mol = saltremover.StripMol(mol, dontRemoveEverything=True)
+
+
 def apply_funcs(df, 
                 idx_i=None, 
                 idx_j=None, 
                 smiles_col='SMILES', 
+                rm_salts=True, 
                 drop_mol=True, 
                 verbose=True):
     """
@@ -191,6 +212,13 @@ def apply_funcs(df,
     """
 
     df.loc[idx_i:idx_j, 'Mol'] = [GetMol(smi) for smi in df.loc[idx_i:idx_j, smiles_col]]
+
+    if rm_salts:
+        saltremover = SaltRemover()
+        df.loc[idx_i:idx_j]\
+          .loc[df['Mol'].notna(), 'Mol']\
+          .apply(lambda mol: saltremover.StripMol(mol, 
+                                                  dontRemoveEverything=True))
 
     # Standard representations:
     if verbose:
@@ -230,6 +258,11 @@ def apply_funcs(df,
         df.loc[idx_i:idx_j, 'Possible_tauto_stereo'] = \
             df.loc[idx_i:idx_j].apply(lambda row: 
                                       GetPossibleTautomersStereoisomers(row['Mol']), axis=1)
+        df.loc[idx_i:idx_j, 'Murcko_scaffold'] = \
+            df.loc[idx_i:idx_j].apply(lambda row: 
+                                      MurckoScaffoldSmiles(mol=row['Mol'], 
+                                                           axis=1, 
+                                                           includeChirality=False))
     else:
         df.loc[idx_i:idx_j, 'Possible_tauto'] = \
             [list(GetPossibleTautomers(mol)) for mol in df.loc[idx_i:idx_j, 'Mol']]
@@ -242,6 +275,9 @@ def apply_funcs(df,
             #df.loc[idx_i:idx_j, 'Possible_stereo'].apply(list).apply(len)
         df.loc[idx_i:idx_j, 'Possible_tauto_stereo'] = \
             [GetPossibleTautomersStereoisomers(mol) for mol in df.loc[idx_i:idx_j, 'Mol']]
+        df.loc[idx_i:idx_j, 'Murcko_scaffold'] = \
+            [MurckoScaffoldSmiles(smiles=smi, includeChirality=False) for smi in df.loc[idx_i:idx_j, 'Canon_SMILES']]
+            #[MurckoScaffoldSmiles(mol=mol, includeChirality=False) for mol in df.loc[idx_i:idx_j, 'Mol']]
 
     # Get additional information about the molecule:
     if verbose:
@@ -272,6 +308,14 @@ def apply_funcs(df,
         [mol.GetNumHeavyAtoms() for mol in df.loc[idx_i:idx_j, 'Mol']]
     df.loc[idx_i:idx_j, 'NumRotBonds'] = \
         [Chem.rdMolDescriptors.CalcNumRotatableBonds(mol) for mol in df.loc[idx_i:idx_j, 'Mol']]
+    df.loc[idx_i:idx_j, 'LogP'] = \
+        [Chem.Descriptors.MolLogP(mol) for mol in df.loc[idx_i:idx_j, 'Mol']]
+    df.loc[idx_i:idx_j, 'NumHDonors'] = \
+        [Chem.rdMolDescriptors.CalcNumHBD(mol) for mol in df.loc[idx_i:idx_j, 'Mol']]
+    df.loc[idx_i:idx_j, 'NumHAcceptors'] = \
+        [Chem.rdMolDescriptors.CalcNumHBA(mol) for mol in df.loc[idx_i:idx_j, 'Mol']]
+    df.loc[idx_i:idx_j, 'PassLipinski'] = \
+        [_pass_lipinski(*row) for _, row in df.loc[idx_i:idx_j, ['MolWt', 'LogP', 'NumHDonors', 'NumHAcceptors']].iterrows()]
 
     # Drop Mol column:
     if drop_mol:
@@ -338,3 +382,86 @@ def generate_dataset_report(df):
     print('Number of unique canonical SMILES: {}'.format(len(df.drop_duplicates('Canon_SMILES'))))
     print('Number of unique 2D canonical SMILES: {}'.format(len(df.drop_duplicates('2D_SMILES'))))
     print('Number of enantiomer pairs: {}'.format(len(df['Enantiomer'].drop_na())//2))
+
+
+# Aggregate experimental data:
+# ----------------------------
+
+
+def aggregate_compound_measurements(df, 
+                                    opr_col, 
+                                    val_col,  
+                                    groupby_col='Smiles'):
+    """
+    Run on dataframe to return dataset with 
+
+    >>> df = pd.DataFrame(data=[['CCCCCOCCC', "'='", 7.8],
+    ...                         ['CCCCCOCCC', "'='", 6.4],
+    ...                         ['CCC(=O)OCCC', "'='", 4.6],
+    ...                         ['FCCC(=O)CC', "'<'", 4.3],
+    ...                         ['FCCC(=O)CC', "'='", 6.3],
+    ...                         ['CCC(=O)OCCC', "'>'", 4.4],
+    ...                         ['CCC(=O)C', "'<='", 5.3]],
+    ...                   columns=['Smiles', 'pIC50_opr', 'pIC50_val'])
+    >>> df
+            Smiles pIC50_opr  pIC50_val
+    0    CCCCCOCCC       '='        7.8
+    1    CCCCCOCCC       '='        6.4
+    2  CCC(=O)OCCC       '='        4.6
+    3   FCCC(=O)CC       '<'        4.3
+    4   FCCC(=O)CC       '='        6.3
+    5  CCC(=O)OCCC       '>'        4.4
+    6     CCC(=O)C      '<='        5.3
+    >>> aggregate_compound_measurements(df, 
+    ...                                 opr_col='pIC50_opr', 
+    ...                                 val_col='pIC50_val')
+                 n  mean  std  range individual_equal_values  failed_inequalities
+    Smiles                                                                       
+    CCC(=O)C     0   NaN  NaN    NaN                      []                False
+    CCC(=O)OCCC  1   4.6  0.0    0.0                   [4.6]                False
+    CCCCCOCCC    2   7.1  0.7    1.4              [7.8, 6.4]                False
+    FCCC(=O)CC   1   6.3  0.0    0.0                   [6.3]                 True
+    """
+
+    df_out = \
+    df.groupby(groupby_col)\
+      .apply(lambda d: _aggregate_measurements(d,
+                                              opr_col=opr_col,
+                                              val_col=val_col))\
+      .to_frame()\
+      .apply(lambda x: x[0], axis=1, result_type='expand')\
+      .rename(columns={0 : 'n',
+                       1 : 'mean',
+                       2 : 'std',
+                       3 : 'range',
+                       4 : 'individual_equal_values',
+                       5 : 'failed_inequalities'})
+    return df_out
+
+
+def _aggregate_measurements(df_grp, opr_col, val_col):
+    """
+    Run on data dataframe grouped into distinct compounds (e.g. grouped by 
+    SMILES).
+    """
+
+    eq_vals = df_grp.loc[(df_grp[opr_col] == "'='") & \
+                         df_grp[val_col].notna(), val_col].to_numpy()
+    if len(eq_vals) == 0:
+        return 0, np.nan, np.nan, np.nan, [], False #[]
+
+    n_vals = len(eq_vals)
+    av = np.mean(eq_vals)
+    std = np.std(eq_vals)
+    rng = max(eq_vals) - min(eq_vals)
+
+    failed_ineq = False #[]
+    for opr in ["'>'", "'>='", "'<'", "'<='"]:
+
+        for v in df_grp.loc[df_grp[opr_col] == opr, val_col]:
+            if not np.all(eval('{} {} {}'.format('eq_vals', 
+                                                 opr.strip("'"), 
+                                                 v))):
+                failed_ineq = True
+
+    return n_vals, av, std, rng, eq_vals, failed_ineq
