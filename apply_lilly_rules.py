@@ -7,10 +7,9 @@ import tempfile
 import pandas as pd
 import glob
 from rdkit import Chem
-
 import sys, os
-sys.path.insert(0, '/users/xpb20111/programs/')
-from python_utils.pandas_utils import conv_df_to_str
+
+from .python_utils.pandas_utils import conv_df_to_str
 
 
 # Probably move this to smi_funcs.py:
