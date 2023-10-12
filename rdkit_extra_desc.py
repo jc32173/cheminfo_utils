@@ -9,12 +9,18 @@ import numpy as np
 import sys, os
 
 # Should be able to get RDContribDir from: 
-# from rdkit.Chem import RDConfig
-# RDContribDir = RDConfig.RDContribDir
-# but isn't pointing to the right directory in deepchem environment so hard-code instead:
-RDContribDir = '/users/xpb20111/.conda/envs/deepchem/share/RDKit/Contrib/'
-sys.path.append(os.path.join(RDContribDir, 'SA_Score'))
-import sascorer
+try:
+    from rdkit.Chem import RDConfig
+    RDContribDir = RDConfig.RDContribDir
+    import sascorer
+except ModuleNotFoundError:
+    # but isn't pointing to the right directory in deepchem environment so hard-code instead:
+    try:
+        RDContribDir = '/users/xpb20111/.conda/envs/deepchem/share/RDKit/Contrib/'
+        sys.path.append(os.path.join(RDContribDir, 'SA_Score'))
+        import sascorer
+    except ModuleNotFoundError:
+        sascorer = False
 
 
 # Useful for checking for macrocycles:
@@ -142,6 +148,9 @@ extra_rdkit_descs = [('max_ring_size', max_ring_size),
                      ('TotalNumProtons', GetTotalNumProtons), 
                      ('TotalNumElectrons', GetTotalNumElectrons), 
                      ('NumHs', GetNumHs), 
-                     ('SAscore', sascorer.calculateScore), 
+                     #('SAscore', sascorer.calculateScore), 
                      ('num_groups_fused_rings', lambda m: len(GetFusedRings(m))), 
                      ('max_fused_rings', lambda m: len(GetFusedRings(m)[0]))]
+
+if sascorer:
+    extra_rdkit_descs.append(('SAscore', sascorer.calculateScore))
