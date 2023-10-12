@@ -114,7 +114,7 @@ def apply_lilly_rules(df=None,
 
     # Run Lilly rules script
     lilly_results = \
-            subprocess.run([f'cd {run_dir}; {lilly_rules_script} {temp.name}'], 
+            subprocess.run([f'cd {run_dir}; ruby {lilly_rules_script} {temp.name}'], 
                    shell=True, 
                    stdout=subprocess.PIPE, 
                    stderr=subprocess.PIPE)
