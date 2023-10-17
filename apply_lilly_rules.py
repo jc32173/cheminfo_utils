@@ -82,7 +82,7 @@ def apply_lilly_rules(df=None,
 
     n_cmpds = len(df)
 
-    df[smiles_col+'_Kekule'] = df[smiles_col].apply(KekulizeSmiles)
+    df.loc[:,smiles_col+'_Kekule'] = df[smiles_col].apply(KekulizeSmiles)
 
     smi_file_txt = conv_df_to_str(df[[smiles_col+'_Kekule', 'ID']],
                                   sep=' ',
@@ -138,13 +138,14 @@ def apply_lilly_rules(df=None,
 
     # Get reasons for failures:
     failures = []
-    for bad_file in glob.glob(run_dir+'bad*.smi'):
-        for line in open(bad_file, 'r').readlines():
-            line = line.split(' ')
-            smiles = line[0]
-            molid = line[1]
-            warning = ' '.join(line[2:]).strip(': \n')
-            failures.append([molid, warning, smiles])
+    for bad_filename in glob.glob(run_dir+'bad*.smi'):
+        with open(bad_filename, 'r') as bad_file:
+            for line in bad_file.readlines():
+                line = line.split(' ')
+                smiles = line[0]
+                molid = line[1]
+                warning = ' '.join(line[2:]).strip(': \n')
+                failures.append([molid, warning, smiles])
 
     # Close and remove tempfile:
     # (Do this even if run in a temporary directory to prevent warning when
