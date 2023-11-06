@@ -57,7 +57,7 @@ def canonicalise_tautomer(smi, method='RDKit'):
     """
 
     # Access any rdkit errors from stderr:
-    Chem.WrapLogs()
+    #Chem.WrapLogs()
     sio = sys.stderr = StringIO()
 
     if method == 'RDKit':
@@ -165,7 +165,7 @@ def correct_smiles(smi, smi_transforms, check_rdkit=True):
     """
 
     # Access any rdkit errors from stderr:
-    Chem.WrapLogs()
+    #Chem.WrapLogs()
     sio = sys.stderr = StringIO()
 
     for match_pat, repl_pat in smi_transforms:
@@ -209,7 +209,7 @@ def adjust_for_ph(smi,
     if phmodel == 'OpenBabel':
 
         # Access any rdkit errors from stderr:
-        Chem.WrapLogs()
+        #Chem.WrapLogs()
         sio = sys.stderr = StringIO()
 
         # Set BABEL_DATADIR environment variable if using a modified 
