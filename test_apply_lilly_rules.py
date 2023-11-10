@@ -1,12 +1,33 @@
 import unittest
 import pandas as pd
+import os
 from pandas.testing import assert_frame_equal
 from cheminfo_utils.apply_lilly_rules import apply_lilly_rules
 
+
 class Test_apply_lilly_rules(unittest.TestCase):
-    def test_1(self, 
-               lilly_rules_script=\
-        '/users/xpb20111/software/Lilly-Medchem-Rules/Lilly_Medchem_Rules.rb'):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.lilly_rules_script = os.getenv('lilly_rules_script')
+
+    def assertDataframeEqual(self, a, b, msg):
+        try:
+            assert_frame_equal(a, b)
+        except AssertionError as e:
+            #return self.failureException(e)
+            #raise self.failureException(e) #msg) from e
+            raise self.failureException(e) from None
+
+    def setUp(self):
+        self.addTypeEqualityFunc(pd.DataFrame, self.assertDataframeEqual)
+
+    #def test_0(self):
+    #    a = 10
+    #    #self.longMessage = True
+    #    self.assertEqual(0, a, 'a=0')
+
+    def test_1(self):
 
         expected_results = \
         pd.DataFrame(data=[['CCCCCCC(=O)O', 'CCCCCCC(=O)O', True, 
@@ -25,6 +46,7 @@ class Test_apply_lilly_rules(unittest.TestCase):
                                                  'CCC', 
                                                  'CCCCC(=O)OCC', 
                                                  'c1ccccc1CC(=O)C'], 
-                                         lilly_rules_script=lilly_rules_script)
+                                         lilly_rules_script=self.lilly_rules_script)
 
-        assert_frame_equal(expected_results, test_results)
+        #assert_frame_equal(expected_results, test_results)
+        self.assertEqual(expected_results, test_results)
