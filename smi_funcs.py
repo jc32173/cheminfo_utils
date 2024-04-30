@@ -150,6 +150,129 @@ def canonicalise_tautomer_substruct(cmpd, substruct=None):
     return enumerator.Canonicalize(cmpd)
 
 
+# Canonicalise tautomer, but preserve given substructure tautomer form:
+def canonicalise_tautomer_substructs(mol, 
+                                     substructs=[], 
+                                     match_type='all', # 'any', 
+                                     kekulize=False, 
+                                     max_tautomers=None, 
+                                     verbose=False, 
+                                     **kwargs):
+    """
+    Select the canonical tautomer as the highest scoring tautomer which has a 
+    given tautomeric form for common substructures.
+
+    match_type : 'all' : Return the highest ranked tautomer which contains 
+                         all, or as many as possible, of the substructures.
+                 'any' : Return the highest ranked tautomer which has at least 
+                         one of the substructures
+    
+    # Return highest ranked tautomer which contains the given substructure:
+    >>> mol = Chem.MolFromSmiles('CC(=O)CCCCCC(=O)CC')
+    >>> substructs = [Chem.MolFromSmiles('C=C(O)C')]
+    >>> Chem.MolToSmiles(canonicalise_tautomer_substructs(mol, substructs=substructs))
+    'CCC(O)=CCCCCC(C)=O'
+
+    If match_type == 'all', as many substructures as possible are present in the final tautomer:
+    >>> mol = Chem.MolFromSmiles('CCC(=O)OCCCC(=O)CN')
+    >>> substructs = [Chem.MolFromSmiles('CC=C(O)OCC'), 
+    ...               Chem.MolFromSmiles('C(O)=CN')]
+    >>> Chem.MolToSmiles(canonicalise_tautomer_substructs(mol,
+    ...                                                   substructs=substructs,
+    ...                                                   match_type='all'))
+    'CC=C(O)OCCCC(O)=CN'
+    
+    If match_type == 'any', the highest ranked tautomer with at least one substructure (if possible) is returned:
+    >>> mol = Chem.MolFromSmiles('CCC(=O)OCCCC(=O)CN')
+    >>> substructs = [Chem.MolFromSmiles('CC=C(O)OCC'), 
+    ...               Chem.MolFromSmiles('C(O)=CN')]
+    >>> Chem.MolToSmiles(canonicalise_tautomer_substructs(mol,
+    ...                                                   substructs=substructs,
+    ...                                                   match_type='all'))
+    'CC=C(O)OCCCC(O)=CN'
+    
+    # Normal canonical tautomer is returned if no substructure matches found:
+    >>> mol = Chem.MolFromSmiles('C2[C-]([O-])[N+](C=[N+](O)O)=C([O-])N2C[N+](C)(C)O')
+    >>> substructs = [Chem.MolFromSmiles('C1NC(=O)NC(=O)1')]
+    >>> Chem.MolToSmiles(canonicalise_tautomer_substructs(mol, substructs=substructs))
+    'C[N+](C)(O)CN1C[C-]([O-])[N+](C=[N+](O)O)=C1[O-]'
+    """
+
+    enumerator = rdMolStandardize.TautomerEnumerator()
+
+    # Set the maximum number of tautomers to consider (default for 
+    # TautomerEnumerator in RDKit is 1000:
+    if max_tautomers is not None:
+        enumerator.SetMaxTautomers(max_tautomers)
+
+    # Kekulize mol to allow tautomer enumeration to break aromaticity 
+    # to find tautomers with given substructures:
+    if kekulize:
+        Chem.Kekulize(mol, clearAromaticFlags=True)
+
+    #if isinstance(cmpd, str):
+    #    cmpd = Chem.MolFromSmiles(cmpd)
+
+    n_substructs = len(substructs)
+    if n_substructs == 0:
+        return enumerator.Canonicalize(mol)
+
+    #if isinstance(substruct, str):
+    #    substruct = Chem.MolFromSmiles(substruct)
+
+    #Chem.Kekulize(mol, clearAromaticFlags=True)
+
+    tauto_ls = []
+    for i, tauto in enumerate(enumerator.Enumerate(mol)):
+        tauto_ls.append([enumerator.ScoreTautomer(tauto), tauto])
+
+    # Sort based on tautomer scores:
+    tauto_ls = sorted(tauto_ls, key=lambda x: x[0])[::-1]
+
+    # Return the highest ranked tautomer which matches any of the 
+    # substructures:
+    if match_type == 'any':
+        for  _, tauto in tauto_ls:
+            for substruct_i, substruct in enumerate(substructs):
+                if tauto.HasSubstructMatch(substruct):
+                    if verbose:
+                        print('Best tautomer includes substructure: {}'.format(Chem.MolToSmiles(substruct)))
+                    return tauto
+        if verbose:
+            print('No tautomer containing any substructure found')
+        return tauto_ls[0][1]
+
+    # Return the highest ranked tautomer which matches as many of the 
+    # substructures as possible:
+    elif match_type == 'all':
+        best_tauto = tauto_ls[0][1]
+        best_n_substruct_matches = 0
+        for _, tauto in tauto_ls:
+            #substruct_matches = [False]*n_substructs
+            n_substruct_matches = 0
+            for substruct_i, substruct in enumerate(substructs):
+                if tauto.HasSubstructMatch(substruct):
+                    #substruct_matches[substruct_i] = True
+                    n_substruct_matches += 1
+            #n_substruct_matches = sum(substruct_matches)
+            # If tautomer matches all substructures then return immediately:
+            if n_substruct_matches == n_substructs:
+                if verbose:
+                    print('Tautomer matches all substructures')
+                return tauto
+            # If more substructures have matches, update best tautomer:
+            elif n_substruct_matches > best_n_substruct_matches:
+                best_n_substruct_matches = n_substruct_matches
+                best_tauto = tauto
+
+        if verbose:
+            print('Best tautomer matches {} substructures'.format(best_n_substruct_matches))
+        return best_tauto
+
+    else:
+        return None
+
+
 #def select_tautomer(rank=0):
 #    """
 #    Select specific ranked tautomer or one tautomer at random.
@@ -190,7 +313,7 @@ def correct_smiles(smi, smi_transforms, check_rdkit=True):
 # Protonate/deprotonate to get SMILES at a given pH:
 def adjust_for_ph(smi, 
                   ph=7.4, 
-                  phmodel='OpenEye', 
+                  phmodel='OpenBabel', 
                   phmodel_dir=None, 
                   #verbose=0 # False
                  ):
@@ -244,6 +367,9 @@ def adjust_for_ph(smi,
         sys.stderr = sys.__stderr__
 
     elif phmodel == 'OpenEye':
+        if not openeye_available:
+            print('ERROR: OpenEye not installed')
+            raise openeye_import_error from None
 
         # Save any OE errors:
         warnos = oechem.oeosstream()
@@ -267,7 +393,12 @@ def adjust_for_ph(smi,
 
 # Process SMILES before calculating descriptors
 # (canonicalise tautomer, correct smiles, adjust for ph)
-def process_smiles(smi, tauto=False, ph=None, phmodel=None, canon_smiles=False):
+def process_smiles(smi, 
+                   tauto=False, 
+                   tauto_opts={}, 
+                   ph=None, 
+                   phmodel=None, 
+                   canon_smiles=False):
     """
     Process SMILES by converting to canonical tautomer, specific pH and 
     canonical SMILES.
@@ -275,10 +406,35 @@ def process_smiles(smi, tauto=False, ph=None, phmodel=None, canon_smiles=False):
     warnings = ''
 
     if tauto:
-        # Convert to canonical tautomer using rdkit:
-        smi, warning = canonicalise_tautomer(smi, method='RDKit')
-        if warning != '':
-            warnings += warning
+
+        # Choose the canonical tautomer as the highest ranked tautomer which 
+        # preserves given substructures:
+        if tauto == 'RDKit_preserve_substructs':
+            if not tauto_opts.get('substructs'):
+                # Read substructures from SMARTS:
+                if tauto_opts.get('substruct_smarts'):
+                    tauto_opts['substructs'] = \
+                        [Chem.MolFromSmiles(s) 
+                         for s in tauto_opts['substruct_smarts']]
+                # Read substructures from SMILES:
+                elif tauto_opts.get('substruct_smiles'):
+                    tauto_opts['substructs'] = \
+                        [Chem.MolFromSmiles(s) 
+                         for s in tauto_opts['substruct_smiles']]
+                else:
+                    tauto_opts['substructs'] = []
+
+            mol = Chem.MolFromSmiles(smi)
+
+            tauto = canonicalise_tautomer_substructs(mol, **tauto_opts)
+
+            smi = Chem.MolToSmiles(tauto)
+
+        # Convert to canonical tautomer using default rdkit approach:
+        else:
+            smi, warning = canonicalise_tautomer(smi, method='RDKit')
+            if warning != '':
+                warnings += warning
 
     # Correct known errors in SMILES from canonicalizeTautomers in rdkit:
     smi, warning = correct_smiles(smi, [[r"\[PH\]\(=O\)\(=O\)O",
